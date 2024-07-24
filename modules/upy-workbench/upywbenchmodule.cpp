@@ -459,6 +459,9 @@ public:
         m_testRunAction->setEnabled(false);
         m_devResetAction->setEnabled(false);
 
+        // we are not running yet
+        m_stopped = true;
+
         // close the serial connection that the user is using interactively
         m_devConnectAction->setChecked(false);
         if (m_userSerial->isOpen())
@@ -469,7 +472,7 @@ public:
             if (p->dataTypeId() == BaseDataType::IntSignalBlock || p->dataTypeId() == BaseDataType::FloatSignalBlock) {
                 auto stream = p->streamVar();
                 stream->setMetadataValue("signal_names", QStringList() << "Data");
-                stream->setMetadataValue("time_unit", "milliseconds");
+                stream->setMetadataValue("time_unit", "microseconds");
             }
 
             p->startStream();
@@ -488,7 +491,7 @@ public:
         m_clockSync->setCalibrationPointsCount(30);
         m_clockSync->setTolerance(milliseconds_t(2));
         m_clockSync->setStrategies(TimeSyncStrategy::SHIFT_TIMESTAMPS_FWD | TimeSyncStrategy::SHIFT_TIMESTAMPS_BWD);
-        m_baseTimeOffset = milliseconds_t(0);
+        m_baseTimeOffset = microseconds_t(0);
 
         // start the synchronizer
         if (!m_clockSync->start()) {
@@ -544,17 +547,20 @@ public:
         if (isIntBlock || isFloatBlock) {
             const auto array = obj["d"].toArray();
             const auto arrayLen = array.size();
-            const auto deviceTimestamp = microseconds_t((obj["t"].toInt() - m_baseTimeOffset.count()) * 1000);
+            const auto jTs = obj["t"];
+            if (!jTs.isUndefined()) {
+                const auto deviceTimestamp = microseconds_t(
+                    static_cast<int64_t>(jTs.toDouble() * 1000) - m_baseTimeOffset.count());
 
-            // synchronize
-            m_clockSync->processTimestamp(recvMasterTime, deviceTimestamp);
-            const auto syncTimestampMsec = static_cast<quint32>(recvMasterTime.count() / 1000);
+                // synchronize
+                m_clockSync->processTimestamp(recvMasterTime, deviceTimestamp);
+            }
 
             if (isIntBlock) {
                 IntSignalBlock block(arrayLen);
                 for (int i = 0; i < arrayLen; i++) {
                     block.data(i, 0) = array[i].toInt();
-                    block.timestamps(i, 0) = syncTimestampMsec;
+                    block.timestamps(i, 0) = recvMasterTime.count();
                 }
 
                 std::static_pointer_cast<DataStream<IntSignalBlock>>(stream)->push(block);
@@ -562,7 +568,7 @@ public:
                 FloatSignalBlock block(arrayLen);
                 for (int i = 0; i < arrayLen; i++) {
                     block.data(i, 0) = array[i].toDouble();
-                    block.timestamps(i, 0) = syncTimestampMsec;
+                    block.timestamps(i, 0) = recvMasterTime.count();
                 }
 
                 std::static_pointer_cast<DataStream<FloatSignalBlock>>(stream)->push(block);
@@ -726,7 +732,7 @@ public:
                         }
                         streamMap[jd["i"].toInt()] = oport->streamVar();
                     } else if (command == "start-time") {
-                        m_baseTimeOffset = milliseconds_t(jd["t_ms"].toInt());
+                        m_baseTimeOffset = microseconds_t(static_cast<int64_t>(jd["t_ms"].toDouble() * 1000));
                     }
                 }
             }
@@ -830,7 +836,7 @@ private:
 
     std::atomic_bool m_stopped;
     std::vector<std::shared_ptr<StreamInputPort<TableRow>>> m_activeInPorts;
-    milliseconds_t m_baseTimeOffset = milliseconds_t(0);
+    microseconds_t m_baseTimeOffset = microseconds_t(0);
     std::unique_ptr<SecondaryClockSynchronizer> m_clockSync;
 };
 
