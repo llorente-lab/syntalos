@@ -24,7 +24,7 @@
 
 SYNTALOS_DECLARE_MODULE
 
-class GenericCameraModuleInfo : public ModuleInfo
+class OrbbecCameraModuleInfo : public ModuleInfo
 {
 public:
     QString id() const final;

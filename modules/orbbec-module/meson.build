@@ -1,38 +1,41 @@
-# Build definitions for module: camera-generic
+# Specify OrbbecSDK path
+orbbec_sdk_path = '/home/llorentelab/Desktop/OrbbecSDK'
 
+# Create custom OrbbecSDK dependency
+orbbec_sdk_dep = declare_dependency(
+    include_directories: include_directories(orbbec_sdk_path + '/include'),
+    link_args: ['-L' + orbbec_sdk_path + '/lib/linux_x64', '-lOrbbecSDK']
+)
+
+# Build definitions for module: camera-generic
 module_hdr = [
-    'genericcameramodule.h',
-    'camera.h'
+    'orbbecmodule.h',
 ]
 module_moc_hdr = [
-    'genericcamerasettingsdialog.h'
+    'orbbecmodule.h'
 ]
 
 module_src = [
-    'camera.cpp',
-    'genericcamerasettingsdialog.cpp'
-]
-module_moc_src = [
-    'genericcameramodule.cpp'
+    'orbbecmodule.cpp'
 ]
 
-module_ui = ['genericcamerasettingsdialog.ui']
+module_moc_src = [
+    'orbbecmodule.cpp'
+]
+module_ui = []
 
 v4l_dep = dependency('libv4l2')
 module_deps = [
     opencv_dep,
+    orbbec_sdk_dep,
     vips_dep,
     v4l_dep,
 ]
-
 module_data = []
 
-#
 # Generic module setup
-#
 module_name = fs.name(meson.current_source_dir()).to_lower().underscorify().replace('_', '-')
 mod_install_dir = join_paths(sy_modules_dir, fs.name(meson.current_source_dir()))
-
 module_moc = qt.preprocess(
     moc_headers: module_moc_hdr,
     moc_sources: module_moc_src,
@@ -41,6 +44,9 @@ module_moc = qt.preprocess(
     dependencies: module_deps,
     moc_extra_arguments: ['--no-notes'],
 )
+
+orbbec_sdk_inc = include_directories(orbbec_sdk_path + '/include')
+
 mod = shared_module(module_name,
     [module_hdr, module_moc_hdr,
      module_src, module_moc_src,
@@ -48,6 +54,7 @@ mod = shared_module(module_name,
     name_prefix: '',
     dependencies: [syntalos_fabric_dep,
                    module_deps],
+    include_directories: [orbbec_sdk_inc],
     cpp_args: module_args,
     install: true,
     install_dir: mod_install_dir,
@@ -70,6 +77,7 @@ install_data(
 foreach fname : module_data
     fs.copyfile(fname)
 endforeach
+
 module_hdr = []
 module_src = []
 module_moc_hdr = []

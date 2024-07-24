@@ -1,0 +1,28 @@
+[syntalos_module]
+type = "python"
+
+name = "Orbbec Acquire"
+description = "Record with an orbbec depth sensor"
+icon = "penrose-py.svg"
+
+main = "pyorbbec.py"
+use_venv = false
+
+categories = 'processing'
+
+[ports]
+
+    [[ports.in]]
+    data_type = 'Frame'
+    id = 'frames-in'
+    title = 'Frames'
+
+    [[ports.out]]
+    data_type = 'TableRow'
+    id = 'rows-out'
+    title = 'Indices'
+
+    [[ports.out]]
+    data_type = 'Frame'
+    id = 'frames-out'
+    title = 'Marked Frames'

@@ -17,22 +17,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "genericcameramodule.h"
+#include "orbbeccameramodule.h"
 
 #include "datactl/frametype.h"
 #include <QDebug>
 
-#include "camera.h"
-#include "genericcamerasettingsdialog.h"
+#include "orbbec_camera.h"
+#include "orbbeccamerasettingsdialog.h"
 
-SYNTALOS_MODULE(GenericCameraModule)
+SYNTALOS_MODULE(OrbbecCameraModule)
 
-class GenericCameraModule : public AbstractModule
+class OrbbecCameraModule : public AbstractModule
 {
     Q_OBJECT
 private:
-    Camera *m_camera;
-    GenericCameraSettingsDialog *m_camSettingsWindow;
+    OrbbecCamera *m_camera;
+    OrbbecCameraSettingsDialog *m_camSettingsWindow;
 
     std::atomic_bool m_stopped;
     double m_fps;
@@ -41,22 +41,22 @@ private:
     std::unique_ptr<SecondaryClockSynchronizer> m_clockSync;
 
 public:
-    explicit GenericCameraModule(QObject *parent = nullptr)
+    explicit OrbbecCameraModule(QObject *parent = nullptr)
         : AbstractModule(parent),
-          m_camera(new Camera),
+          m_camera(new OrbbecCamera),
           m_camSettingsWindow(nullptr),
           m_stopped(true)
     {
         m_outStream = registerOutputPort<Frame>(QStringLiteral("video"), QStringLiteral("Video"));
 
-        m_camSettingsWindow = new GenericCameraSettingsDialog(m_camera);
+        m_camSettingsWindow = new OrbbecCameraSettingsDialog(m_camera);
         addSettingsWindow(m_camSettingsWindow);
 
         // set initial window titles
         setName(name());
     }
 
-    ~GenericCameraModule()
+    ~OrbbecCameraModule()
     {
         delete m_camera;
     }
@@ -79,6 +79,19 @@ public:
 
     bool prepare(const TestSubject &) override
     {
+        try {
+            ob::Context ctx;
+            auto devices = ctx.queryDeviceList();
+            if (devices->deviceCount == 0) {
+                raiseError("No Orbbec sensor found");
+                return false;
+            }
+        }
+
+        auto device = devices->getDevice(0);
+        
+
+
         if (m_camera->camId() < 0) {
             raiseError("Unable to continue: No valid camera was selected!");
             return false;
@@ -236,39 +249,39 @@ public:
     }
 };
 
-QString GenericCameraModuleInfo::id() const
+QString OrbbecCameraModuleInfo::id() const
 {
     return QStringLiteral("camera-generic");
 }
 
-QString GenericCameraModuleInfo::name() const
+QString OrbbecCameraModuleInfo::name() const
 {
     return QStringLiteral("Generic Camera");
 }
 
-QString GenericCameraModuleInfo::description() const
+QString OrbbecCameraModuleInfo::description() const
 {
     return QStringLiteral("Record video with a regular camera compatible with Linux' V4L API.");
 }
 
-ModuleCategories GenericCameraModuleInfo::categories() const
+ModuleCategories OrbbecCameraModuleInfo::categories() const
 {
     return ModuleCategory::DEVICES;
 }
 
-QIcon GenericCameraModuleInfo::icon() const
+QIcon OrbbecCameraModuleInfo::icon() const
 {
     return QIcon(":/module/camera-generic");
 }
 
-QColor GenericCameraModuleInfo::color() const
+QColor OrbbecCameraModuleInfo::color() const
 {
     return QColor::fromRgba(qRgba(29, 158, 246, 180)).darker();
 }
 
-AbstractModule *GenericCameraModuleInfo::createModule(QObject *parent)
+AbstractModule *OrbbecCameraModuleInfo::createModule(QObject *parent)
 {
-    return new GenericCameraModule(parent);
+    return new OrbbecCameraModule(parent);
 }
 
-#include "genericcameramodule.moc"
+#include "OrbbecCameramodule.moc"

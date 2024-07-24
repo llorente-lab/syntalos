@@ -1,10 +1,8 @@
 # Syntalos Modules
-
 # module setup boilerplate
 module_lib_def_tmpl = files('module-lib-def.toml.in')
 ln_exe = find_program('ln')
 modules_enabled = get_option('modules')
-
 module_hdr = []
 module_src = []
 module_moc_hdr = []
@@ -33,6 +31,8 @@ subdir('audiosource')
 subdir('videorecorder')
 subdir('videotransform')
 subdir('camera-generic')
+subdir('orbbec-module')
+subdir('pyorbbec')
 
 if 'camera-arv' in modules_enabled
     subdir('camera-arv')
