@@ -2,6 +2,9 @@
 #include "datactl/frametype.h"
 #include <libobsensor/ObSensor.hpp>
 #include <vips/vips8>
+#include <opencv2/opencv.hpp>
+
+using namespace cv;
 
 SYNTALOS_MODULE(OrbbecModule)
 
@@ -19,12 +22,16 @@ private:
     bool m_pipelineStarted;
     uint64_t m_frameIndex;
 
+    std::unique_ptr<SecondaryClockSynchronizer> m_clockSync;
+    microseconds_t m_lastValidTimestamp;
+
 public:
     explicit OrbbecModule(QObject *parent = nullptr)
         : AbstractModule(parent),
           m_isRecording(false),
           m_pipelineStarted(false),
-          m_frameIndex(0)
+          m_frameIndex(0),
+          m_lastValidTimestamp(0)
     {
         m_irOut = registerOutputPort<Frame>(QStringLiteral("ir-out"), QStringLiteral("Infrared Frames"));
         m_depthOut = registerOutputPort<Frame>(QStringLiteral("depth-out"), QStringLiteral("Depth Frames"));
@@ -70,6 +77,14 @@ public:
             return false;
         }
 
+        m_clockSync = initClockSynchronizer(30);
+        m_clockSync->setStrategies(TimeSyncStrategy::SHIFT_TIMESTAMPS_FWD | TimeSyncStrategy::SHIFT_TIMESTAMPS_BWD);
+
+        if (!m_clockSync->start()) {
+            raiseError(QStringLiteral("Unable to set up a synchronizer!"));
+            return false;
+        }
+
         return true;
     }
 
@@ -88,42 +103,12 @@ public:
             while (m_running) {
                 auto frameSet = m_pipeline->waitForFrames(200);
                 if (frameSet == nullptr) {
+                    qWarning() << "Dropped frame";
                     continue;
                 }
 
-                auto irFrame = frameSet->irFrame();
-                if (irFrame) {
-                    size_t irSize = irFrame->dataSize();
-                    vips::VImage irImage = vips::VImage::new_from_memory(
-                        irFrame->data(),
-                        irSize,
-                        irFrame->width(),
-                        irFrame->height(),
-                        1,  // Assuming RGB
-                        VIPS_FORMAT_UCHAR
-                    );
-
-                    irImage = irImage.cast(VIPS_FORMAT_UCHAR, vips::VImage::option()->set("shift", 8));
-                    
-                    Frame frame(irImage, m_frameIndex, microseconds_t(irFrame->timeStamp()));
-                    m_irOut->push(frame);
-                }
-
-                auto depthFrame = frameSet->depthFrame();
-                if (depthFrame) {
-                    size_t depthSize = depthFrame->dataSize();
-                    vips::VImage depthImage = vips::VImage::new_from_memory(
-                        depthFrame->data(),
-                        depthSize,
-                        depthFrame->width(),
-                        depthFrame->height(),
-                        1,  // Depth is typically single-channel
-                        VIPS_FORMAT_USHORT  // Assuming 16-bit depth
-                    );
-                    
-                    Frame frame(depthImage, m_frameIndex, microseconds_t(depthFrame->timeStamp()));
-                    m_depthOut->push(frame);
-                }
+                processFrame(frameSet->irFrame(), m_irOut);
+                processFrame(frameSet->depthFrame(), m_depthOut);
 
                 m_frameIndex++;
             }
@@ -159,24 +144,73 @@ public:
         if (m_pipeline && m_pipelineStarted) {
             m_pipeline->stopRecord();
         }
+        safeStopSynchronizer(m_clockSync);
     }
 
 private:
+    template<typename T>
+    void processFrame(const T& frame, std::shared_ptr<DataStream<Frame>>& output)
+    {
+        if (!frame || frame->dataSize() == 0) {
+            qWarning() << "Received invalid frame";
+            return;
+        }
+
+        int width = frame->width();
+        int height = frame->height();
+        
+        if (width <= 0 || height <= 0) {
+            qWarning() << "Invalid frame dimensions:" << width << "x" << height;
+            return;
+        }
+
+        auto deviceTimestamp = microseconds_t(frame->timeStamp());
+        auto masterTimestamp = microseconds_t(m_syTimer->timeSinceStartUsec());
+
+        // Handle backwards-moving timestamps
+        if (deviceTimestamp < m_lastValidTimestamp) {
+            qWarning() << "Timestamp moved backwards. Using last valid timestamp.";
+            deviceTimestamp = m_lastValidTimestamp;
+        } else {
+            m_lastValidTimestamp = deviceTimestamp;
+        }
+
+        m_clockSync->processTimestamp(masterTimestamp, deviceTimestamp);
+
+        try {
+            vips::VImage image = vips::VImage::new_from_memory(
+                frame->data(),
+                frame->dataSize(),
+                width,
+                height,
+                1,
+                std::is_same<T, ob::IRFrame>::value ? VIPS_FORMAT_UCHAR : VIPS_FORMAT_USHORT
+            );
+
+            image = image.cast(VIPS_FORMAT_UCHAR, vips::VImage::option()->set("shift", 8));
+
+            Frame outFrame(image, m_frameIndex, masterTimestamp);
+            output->push(outFrame);
+        }
+        catch (const vips::VError& e) {
+            qWarning() << "VIPS error processing frame:" << e.what();
+        }
+    }
 };
 
 QString OrbbecModuleInfo::id() const
 {
-    return QStringLiteral("orbbec-cam");
+    return QStringLiteral("Orbbec Camera");
 }
 
 QString OrbbecModuleInfo::name() const
 {
-    return QStringLiteral("Orbbec Cam Example");
+    return QStringLiteral("Orbbec Depth Sensor");
 }
 
 QString OrbbecModuleInfo::description() const
 {
-    return QStringLiteral("Orbbec depth sensor");
+    return QStringLiteral("Record data with an Orbbec Femto Bolt");
 }
 
 ModuleCategories OrbbecModuleInfo::categories() const
