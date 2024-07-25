@@ -6,8 +6,8 @@ This module interfaces with Orbbec depth cameras and provides depth data
 to other Syntalos modules.
 '''
 
-import syio as sy
-from syio import InputWaitResult, Frame
+import syntalos_mlink as sy
+#from sy import InputWaitResult, Frame
 import numpy as np
 from pyorbbecsdk import *
 import json

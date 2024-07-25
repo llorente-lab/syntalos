@@ -10,7 +10,7 @@ class OrbbecModule : public AbstractModule
     Q_OBJECT
 
 private:
-    std::shared_ptr<DataStream<Frame>> m_colorOut;
+    std::shared_ptr<DataStream<Frame>> m_irOut;
     std::shared_ptr<DataStream<Frame>> m_depthOut;
     std::shared_ptr<ob::Pipeline> m_pipeline;
     std::shared_ptr<ob::Config> m_config;
@@ -26,7 +26,7 @@ public:
           m_pipelineStarted(false),
           m_frameIndex(0)
     {
-        m_colorOut = registerOutputPort<Frame>(QStringLiteral("color-out"), QStringLiteral("Color Frames"));
+        m_irOut = registerOutputPort<Frame>(QStringLiteral("ir-out"), QStringLiteral("Infrared Frames"));
         m_depthOut = registerOutputPort<Frame>(QStringLiteral("depth-out"), QStringLiteral("Depth Frames"));
     }
 
@@ -53,16 +53,16 @@ public:
             m_pipeline = std::make_shared<ob::Pipeline>();
             m_config = std::make_shared<ob::Config>();
 
-            auto colorProfile = m_pipeline->getStreamProfileList(OB_SENSOR_IR)->getVideoStreamProfile(640, OB_HEIGHT_ANY, OB_FORMAT_Y16, 30);
+            auto irProfile = m_pipeline->getStreamProfileList(OB_SENSOR_IR)->getVideoStreamProfile(640, OB_HEIGHT_ANY, OB_FORMAT_Y16, 30);
             auto depthProfile = m_pipeline->getStreamProfileList(OB_SENSOR_DEPTH)->getVideoStreamProfile(640, OB_HEIGHT_ANY, OB_FORMAT_Y16, 30);
 
-            m_config->enableStream(colorProfile);
+            m_config->enableStream(irProfile);
             m_config->enableStream(depthProfile);
 
-            m_colorOut->setMetadataValue("framerate", 30);
+            m_irOut->setMetadataValue("framerate", 30);
             m_depthOut->setMetadataValue("framerate", 30);
 
-            m_colorOut->start();
+            m_irOut->start();
             m_depthOut->start();
 
         } catch (const ob::Error& e) {
@@ -86,25 +86,27 @@ public:
             }
 
             while (m_running) {
-                auto frameSet = m_pipeline->waitForFrames(100);
+                auto frameSet = m_pipeline->waitForFrames(200);
                 if (frameSet == nullptr) {
                     continue;
                 }
 
-                auto colorFrame = frameSet->colorFrame();
-                if (colorFrame) {
-                    size_t colorSize = colorFrame->dataSize();
-                    vips::VImage colorImage = vips::VImage::new_from_memory(
-                        colorFrame->data(),
-                        colorSize,
-                        colorFrame->width(),
-                        colorFrame->height(),
-                        3,  // Assuming RGB
+                auto irFrame = frameSet->irFrame();
+                if (irFrame) {
+                    size_t irSize = irFrame->dataSize();
+                    vips::VImage irImage = vips::VImage::new_from_memory(
+                        irFrame->data(),
+                        irSize,
+                        irFrame->width(),
+                        irFrame->height(),
+                        1,  // Assuming RGB
                         VIPS_FORMAT_UCHAR
                     );
+
+                    irImage = irImage.cast(VIPS_FORMAT_UCHAR, vips::VImage::option()->set("shift", 8));
                     
-                    Frame frame(colorImage, m_frameIndex, microseconds_t(colorFrame->timeStamp()));
-                    m_colorOut->push(frame);
+                    Frame frame(irImage, m_frameIndex, microseconds_t(irFrame->timeStamp()));
+                    m_irOut->push(frame);
                 }
 
                 auto depthFrame = frameSet->depthFrame();

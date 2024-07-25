@@ -14,9 +14,9 @@
                 "/usr/include/glib-2.0",
                 "/usr/lib/x86_64-linux-gnu/glib-2.0/include",
                 "/usr/include/opencv4",
-                "/home/llorentelab/Desktop/OrbbecSDK/build/install/include",
                 "/home/llorentelab/Desktop/syntalos/src",
-                "/home/llorentelab/Desktop/OrbbecSDK/include"
+                "/home/llorentelab/Desktop/OrbbecSDK/include",
+                "/home/llorentelab/orbbec/include/pybind11"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
