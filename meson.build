@@ -5,7 +5,7 @@ project('Syntalos', 'c', 'cpp',
                     'b_lto=true'],
 
   license: 'LGPL-3.0+ and GPL-3.0+',
-  version: '1.2.0',
+  version: '2.0.0',
 )
 
 bug_report_url = 'https://github.com/bothlab/syntalos/issues'
@@ -30,7 +30,7 @@ root_include_dir = include_directories('.')
 fs     = import('fs')
 qt     = import('qt5')
 pkgc   = import('pkgconfig')
-python = import('python').find_installation('python3')
+python = import('python').find_installation('python3', modules: ['numpy'])
 
 #
 # Feature tests
