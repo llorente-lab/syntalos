@@ -291,7 +291,7 @@ QString OrbbecModuleInfo::name() const
 
 QString OrbbecModuleInfo::description() const
 {
-    return QStringLiteral("Record depth data with an Orbbec sensor");
+    return QStringLiteral("Record depth data with an Orbbec depth sensor!");
 }
 
 ModuleCategories OrbbecModuleInfo::categories() const
