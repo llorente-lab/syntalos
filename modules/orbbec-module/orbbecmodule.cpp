@@ -3,7 +3,7 @@
 #include "orbbecmodule.h"
 #include "datactl/frametype.h"
 #include <libobsensor/ObSensor.hpp>
-#include <vips/vips8>
+#include <opencv2/opencv.hpp>
 
 SYNTALOS_MODULE(OrbbecModule)
 
@@ -17,11 +17,11 @@ public:
           m_isRecording(false),
           m_pipelineStarted(false),
           m_frameIndex(0),
-          m_stopped(true),
-          m_fps(30.0)  // Default FPS, adjust if needed
+          m_fps(30.0),  // Default FPS, adjust if needed
+          m_stopped(true)
     {
-        m_irOut = registerOutputPort<Frame>(QStringLiteral("ir-out"), QStringLiteral("Infrared Frames"));
         m_depthOut = registerOutputPort<Frame>(QStringLiteral("depth-out"), QStringLiteral("Depth Frames"));
+        m_irOut = registerOutputPort<Frame>(QStringLiteral("ir-out"), QStringLiteral("IR Frames"));
     }
 
     ~OrbbecModule() override 
@@ -47,17 +47,17 @@ public:
             m_pipeline = std::make_shared<ob::Pipeline>();
             m_config = std::make_shared<ob::Config>();
 
-            auto irProfile = m_pipeline->getStreamProfileList(OB_SENSOR_IR)->getVideoStreamProfile(640, OB_HEIGHT_ANY, OB_FORMAT_Y16, 30);
             auto depthProfile = m_pipeline->getStreamProfileList(OB_SENSOR_DEPTH)->getVideoStreamProfile(640, OB_HEIGHT_ANY, OB_FORMAT_Y16, 30);
+            auto irProfile = m_pipeline->getStreamProfileList(OB_SENSOR_IR)->getVideoStreamProfile(640, OB_HEIGHT_ANY, OB_FORMAT_Y16, 30);
 
-            m_config->enableStream(irProfile);
             m_config->enableStream(depthProfile);
+            m_config->enableStream(irProfile);
 
-            m_irOut->setMetadataValue("framerate", m_fps);
             m_depthOut->setMetadataValue("framerate", m_fps);
+            m_irOut->setMetadataValue("framerate", m_fps);
 
-            m_irOut->start();
             m_depthOut->start();
+            m_irOut->start();
 
         } catch (const ob::Error& e) {
             raiseError(QStringLiteral("Orbbec initialization error: %1").arg(e.getMessage()));
@@ -115,10 +115,15 @@ public:
                     continue;
                 }
 
-                processFrame(frameSet->irFrame(), m_irOut);
-                processFrame(frameSet->depthFrame(), m_depthOut);
+                auto depthFrame = frameSet->depthFrame();
+                if (depthFrame) {
+                    processDepthFrame(depthFrame, m_depthOut);
+                }
 
-                m_frameIndex++;
+                auto irFrame = frameSet->irFrame();
+                if (irFrame) {
+                    processIRFrame(irFrame, m_irOut);
+                }
 
                 const auto totalTime = timeDiffToNowMsec(cycleStartTime);
                 currentFps = static_cast<int>(1 / (totalTime.count() / static_cast<double>(1000)));
@@ -184,9 +189,10 @@ public:
             m_pipeline->stopRecord();
         }
     }
+
 private:
-    std::shared_ptr<DataStream<Frame>> m_irOut;
     std::shared_ptr<DataStream<Frame>> m_depthOut;
+    std::shared_ptr<DataStream<Frame>> m_irOut;
     std::shared_ptr<ob::Pipeline> m_pipeline;
     std::shared_ptr<ob::Config> m_config;
     bool m_isRecording;
@@ -200,71 +206,76 @@ private:
     microseconds_t m_lastMasterTimestamp;
     microseconds_t m_lastDeviceTimestamp;
 
-    template<typename T>
-    void processFrame(const T& frame, std::shared_ptr<DataStream<Frame>>& output)
+    void processDepthFrame(std::shared_ptr<ob::DepthFrame> depthFrame, std::shared_ptr<DataStream<Frame>>& output)
     {
-        if (!frame || frame->dataSize() == 0) {
-            qWarning() << "Received invalid frame";
+        if (!depthFrame || depthFrame->dataSize() == 0) {
+            qWarning() << "Received invalid depth frame";
             return;
         }
 
-        int width = frame->width();
-        int height = frame->height();
+        int width = depthFrame->width();
+        int height = depthFrame->height();
+        float scale = depthFrame->getValueScale();
         
-        if (width <= 0 || height <= 0) {
-            qWarning() << "Invalid frame dimensions:" << width << "x" << height;
-            return;
-        }
+        cv::Mat depthMat(height, width, CV_16UC1, (void*)depthFrame->data());
+        cv::Mat processedDepth = processDepthMat(depthMat, scale);
 
-        try {
-            vips::VImage image = vips::VImage::new_from_memory(
-                frame->data(),
-                frame->dataSize(),
-                width,
-                height,
-                1,
-                std::is_same<T, ob::IRFrame>::value ? VIPS_FORMAT_UCHAR : VIPS_FORMAT_USHORT
-            );
+        microseconds_t masterTimestamp = microseconds_t(m_syTimer->timeSinceStartUsec());
+        microseconds_t deviceTimestamp = microseconds_t(depthFrame->timeStamp());
+        m_clockSync->processTimestamp(masterTimestamp, deviceTimestamp);
 
-            if (std::is_same<T, ob::DepthFrame>::value) {
-                image = processDepthImage(image);
-            } else {
-                image = image.cast(VIPS_FORMAT_UCHAR, vips::VImage::option()->set("shift", 8));
-            }
+        m_lastMasterTimestamp = masterTimestamp;
+        m_lastDeviceTimestamp = deviceTimestamp;
 
-            microseconds_t masterTimestamp = microseconds_t(m_syTimer->timeSinceStartUsec());
-            microseconds_t deviceTimestamp = microseconds_t(frame->timeStamp());
-            m_clockSync->processTimestamp(masterTimestamp, deviceTimestamp);
+        Frame outFrame(processedDepth, m_frameIndex, masterTimestamp);
+        output->push(outFrame);
 
-            m_lastMasterTimestamp = masterTimestamp;
-            m_lastDeviceTimestamp = deviceTimestamp;
-
-            Frame outFrame(image, m_frameIndex, masterTimestamp);
-            output->push(outFrame);
-        }
-        catch (const vips::VError& e) {
-            qWarning() << "VIPS error processing frame:" << e.what();
-        }
+        m_frameIndex++;
     }
 
-    vips::VImage processDepthImage(vips::VImage depthImage)
+    void processIRFrame(std::shared_ptr<ob::IRFrame> irFrame, std::shared_ptr<DataStream<Frame>>& output)
     {
-        depthImage = depthImage.cast(VIPS_FORMAT_FLOAT);
-        auto median = depthImage.median(0);
-        depthImage = median - depthImage;
-        depthImage = depthImage.ifthenelse(0, depthImage > 150); // set 150 as threshold
-        depthImage = depthImage.ifthenelse(0, depthImage < 0);
-
-        double min = depthImage.min();
-        double max = depthImage.max();
-
-        if (max > min) {
-            depthImage = (depthImage - min) / (max - min) * 255;
-        } else {
-            depthImage = depthImage * 0;
+        if (!irFrame || irFrame->dataSize() == 0) {
+            qWarning() << "Received invalid IR frame";
+            return;
         }
 
-        return depthImage.cast(VIPS_FORMAT_UCHAR);
+        int width = irFrame->width();
+        int height = irFrame->height();
+        
+        cv::Mat irMat(height, width, CV_16UC1, (void*)irFrame->data());
+        cv::Mat processedIR = processIRMat(irMat);
+
+        microseconds_t masterTimestamp = microseconds_t(m_syTimer->timeSinceStartUsec());
+        microseconds_t deviceTimestamp = microseconds_t(irFrame->timeStamp());
+        m_clockSync->processTimestamp(masterTimestamp, deviceTimestamp);
+
+        Frame outFrame(processedIR, m_frameIndex, masterTimestamp);
+        output->push(outFrame);
+    }
+
+    cv::Mat processDepthMat(const cv::Mat& depthMat, float scale)
+    {
+        // Convert to 8-bit for visualization
+        cv::Mat depthVis;
+        depthMat.convertTo(depthVis, CV_8UC1, 255.0 / 5000);  // Assuming max depth of 5000mm
+
+        // Apply color map for better visualization
+        cv::Mat colorMappedDepth;
+        cv::applyColorMap(depthVis, colorMappedDepth, cv::COLORMAP_JET);
+
+        return colorMappedDepth;
+    }
+
+    cv::Mat processIRMat(const cv::Mat& irMat)
+    {
+        cv::Mat irVis;
+        irMat.convertTo(irVis, CV_8UC1, 1.0 / 256.0);  // Convert 16-bit to 8-bit
+        
+        cv::Mat colorMappedIR;
+        cv::applyColorMap(irVis, colorMappedIR, cv::COLORMAP_HOT);  // Apply a color map for visualization
+
+        return colorMappedIR;
     }
 };
 
