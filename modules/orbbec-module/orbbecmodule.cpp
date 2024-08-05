@@ -14,10 +14,9 @@ class OrbbecModule : public AbstractModule
 public:
     explicit OrbbecModule(QObject *parent = nullptr)
         : AbstractModule(parent),
-          m_isRecording(false),
           m_pipelineStarted(false),
           m_frameIndex(0),
-          m_fps(30.0),  // Default FPS, adjust if needed
+          m_fps(30.0),  
           m_stopped(true)
     {
         m_depthOut = registerOutputPort<Frame>(QStringLiteral("depth-out"), QStringLiteral("Depth Frames"));
@@ -29,11 +28,12 @@ public:
         if (m_pipeline && m_pipelineStarted) {
             m_pipeline->stop();
         }
+        safeStopSynchronizer(m_clockSync);
     }
 
     ModuleFeatures features() const override
     {
-        return ModuleFeature::SHOW_SETTINGS;
+        return ModuleFeature::REALTIME | ModuleFeature::SHOW_SETTINGS;
     }
 
     ModuleDriverKind driver() const override
@@ -98,14 +98,11 @@ public:
             m_pipeline->start(m_config);
             m_pipelineStarted = true;
 
-            if (m_isRecording) {
-                m_pipeline->startRecord(m_recordingFilename.toStdString().c_str());
-            }
-
             while (m_running) {
                 const auto cycleStartTime = currentTimePoint();
+                std::shared_ptr<ob::FrameSet> frameSet = nullptr;
+                auto frameRecvTime = MTIMER_FUNC_TIMESTAMP(frameSet = m_pipeline->waitForFrames(200));
 
-                auto frameSet = m_pipeline->waitForFrames(200);
                 if (frameSet == nullptr) {
                     frameRecordFailedCount++;
                     if (frameRecordFailedCount > 32) {
@@ -117,12 +114,12 @@ public:
 
                 auto depthFrame = frameSet->depthFrame();
                 if (depthFrame) {
-                    processDepthFrame(depthFrame, m_depthOut);
+                    processDepthFrame(depthFrame, m_depthOut, frameRecvTime);
                 }
 
                 auto irFrame = frameSet->irFrame();
                 if (irFrame) {
-                    processIRFrame(irFrame, m_irOut);
+                    processIRFrame(irFrame, m_irOut, frameRecvTime);
                 }
 
                 const auto totalTime = timeDiffToNowMsec(cycleStartTime);
@@ -138,14 +135,6 @@ public:
                     statusMessage("Acquiring frames...");
                 }
             }
-
-            if (m_isRecording) {
-                m_pipeline->stopRecord();
-            }
-
-            m_pipeline->stop();
-            m_pipelineStarted = false;
-
         } catch (const ob::Error& e) {
             raiseError(QStringLiteral("Orbbec runtime error: %1").arg(e.getMessage()));
         }
@@ -169,34 +158,12 @@ public:
         statusMessage("Camera disconnected.");
     }
 
-    void setRecordingFilename(const QString &filename)
-    {
-        m_recordingFilename = filename;
-    }
-
-    void startRecording()
-    {
-        m_isRecording = true;
-        if (m_pipeline && m_pipelineStarted) {
-            m_pipeline->startRecord(m_recordingFilename.toStdString().c_str());
-        }
-    }
-
-    void stopRecording()
-    {
-        m_isRecording = false;
-        if (m_pipeline && m_pipelineStarted) {
-            m_pipeline->stopRecord();
-        }
-    }
-
 private:
     std::shared_ptr<DataStream<Frame>> m_depthOut;
     std::shared_ptr<DataStream<Frame>> m_irOut;
     std::shared_ptr<ob::Pipeline> m_pipeline;
     std::shared_ptr<ob::Config> m_config;
-    bool m_isRecording;
-    QString m_recordingFilename;
+
     bool m_pipelineStarted;
     uint64_t m_frameIndex;
     double m_fps;
@@ -206,10 +173,10 @@ private:
     microseconds_t m_lastMasterTimestamp;
     microseconds_t m_lastDeviceTimestamp;
 
-    void processDepthFrame(std::shared_ptr<ob::DepthFrame> depthFrame, std::shared_ptr<DataStream<Frame>>& output)
+    void processDepthFrame(std::shared_ptr<ob::DepthFrame> depthFrame, std::shared_ptr<DataStream<Frame>>& output, microseconds_t frameRecvTime)
     {
         if (!depthFrame || depthFrame->dataSize() == 0) {
-            qWarning() << "Received invalid depth frame";
+            qWarning() << "Dropped frame";
             return;
         }
 
@@ -222,18 +189,18 @@ private:
 
         microseconds_t masterTimestamp = microseconds_t(m_syTimer->timeSinceStartUsec());
         microseconds_t deviceTimestamp = microseconds_t(depthFrame->timeStamp());
-        m_clockSync->processTimestamp(masterTimestamp, deviceTimestamp);
+        m_clockSync->processTimestamp(frameRecvTime, deviceTimestamp);
 
         m_lastMasterTimestamp = masterTimestamp;
         m_lastDeviceTimestamp = deviceTimestamp;
 
-        Frame outFrame(processedDepth, m_frameIndex, masterTimestamp);
+        Frame outFrame(processedDepth, m_frameIndex, frameRecvTime);
         output->push(outFrame);
 
         m_frameIndex++;
     }
 
-    void processIRFrame(std::shared_ptr<ob::IRFrame> irFrame, std::shared_ptr<DataStream<Frame>>& output)
+    void processIRFrame(std::shared_ptr<ob::IRFrame> irFrame, std::shared_ptr<DataStream<Frame>>& output, microseconds_t frameRecvTime)
     {
         if (!irFrame || irFrame->dataSize() == 0) {
             qWarning() << "Received invalid IR frame";
@@ -248,9 +215,9 @@ private:
 
         microseconds_t masterTimestamp = microseconds_t(m_syTimer->timeSinceStartUsec());
         microseconds_t deviceTimestamp = microseconds_t(irFrame->timeStamp());
-        m_clockSync->processTimestamp(masterTimestamp, deviceTimestamp);
+        m_clockSync->processTimestamp(frameRecvTime, deviceTimestamp);
 
-        Frame outFrame(processedIR, m_frameIndex, masterTimestamp);
+        Frame outFrame(processedIR, m_frameIndex, frameRecvTime);
         output->push(outFrame);
     }
 
@@ -291,7 +258,7 @@ QString OrbbecModuleInfo::name() const
 
 QString OrbbecModuleInfo::description() const
 {
-    return QStringLiteral("Record depth data with an Orbbec depth sensor!");
+    return QStringLiteral("Capture depth and IR data with an Orbbec depth sensor");
 }
 
 ModuleCategories OrbbecModuleInfo::categories() const
