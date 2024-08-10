@@ -1,6 +1,9 @@
 Syntalos
 ========
 
+[ ] Rearrange and commit milliseconds instead of microseconds
+[ ] Figure out time sync stuff (orbbec module takes too much time to load, maybe mess around with the SDK)
+
 [![Syntalos Screenshot](contrib/screenshots/v0.8.4-ui-overview.png "Syntalos")](https://github.com/bothlab/syntalos/tree/master/contrib/screenshots)
 ![Build Test](https://github.com/bothlab/syntalos/workflows/Build%20Test/badge.svg?branch=master)
 
