@@ -500,7 +500,7 @@ void SecondaryClockSynchronizer::setCalibrationPointsCount(int timepointCount)
         return;
     }
 
-    m_calibrationMaxN = timepointCount > 24 ? timepointCount : 24;
+    m_calibrationMaxN = timepointCount > 46 ? timepointCount : 46;
 }
 
 void SecondaryClockSynchronizer::setExpectedClockFrequencyHz(double frequency)
@@ -524,7 +524,7 @@ void SecondaryClockSynchronizer::setExpectedClockFrequencyHz(double frequency)
     // limit the number of points to at least 24 and the time to a maximum of 90 seconds
     if (m_calibrationMaxN > (frequency * 90.0))
         m_calibrationMaxN = std::ceil((frequency * 90.0));
-    m_calibrationMaxN = m_calibrationMaxN > 24 ? m_calibrationMaxN : 24;
+    m_calibrationMaxN = m_calibrationMaxN > 46 ? m_calibrationMaxN : 46;
 
     // set tolerance of half the time one sample takes to be acquired
     m_toleranceUsec = std::lround(((1000.0 / frequency) / 2) * 1000.0);
@@ -755,13 +755,14 @@ void SecondaryClockSynchronizer::processTimestamp(
 
     if (m_clockUpdateWaitPoints == 0
         && abs(avgOffsetDeviationUsec - m_clockCorrectionOffset.count()) > (m_toleranceUsec / 1.5)) {
-        // try to smoothly adjust the offset to the new value
+        // try to smoothly adjust offset to the new value, dependent on current detected sampling speed
         const double offsetDiff = (double)avgOffsetDeviationUsec - (double)m_clockCorrectionOffset.count();
-        auto delayFactor = (secondaryAcqTimestamp - m_lastSecondaryAcqTS).count() / 800.0;
-        if (delayFactor < 1)
-            delayFactor = 1;
+        const auto timeGap = (secondaryAcqTimestamp - m_lastSecondaryAcqTS).count();
+        auto delayFactor = 1000 * (1 - std::pow((std::log(timeGap + 1) / std::log(1000000 + 1)), 0.117)) + 1;
         if (delayFactor >= abs(offsetDiff))
             delayFactor = abs(offsetDiff) / 4.0;
+        if (delayFactor < 1)
+            delayFactor = 1;
 
         auto adjValue = offsetDiff / delayFactor;
         m_clockCorrectionOffset += microseconds_t((int64_t)std::ceil(adjValue));

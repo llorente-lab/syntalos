@@ -202,7 +202,7 @@ public:
         auto docHelpAction = actionsMenu->addAction("Open Module Documentation");
         connect(docHelpAction, &QAction::triggered, this, [](bool) {
             QDesktopServices::openUrl(
-                QUrl("https://syntalos.readthedocs.io/latest/modules/upy-workbench.html", QUrl::TolerantMode));
+                QUrl("https://syntalos.github.io/docs/modules/upy-workbench/", QUrl::TolerantMode));
         });
         auto docUPyHelpAction = actionsMenu->addAction("Open MicroPython Documentation");
         connect(docUPyHelpAction, &QAction::triggered, this, [](bool) {
@@ -488,7 +488,8 @@ public:
 
         // set up clock synchronizer
         m_clockSync = initClockSynchronizer();
-        m_clockSync->setCalibrationPointsCount(30);
+        // sensible amount of calibration points, since we do not know a framerate
+        m_clockSync->setCalibrationPointsCount(86);
         m_clockSync->setTolerance(milliseconds_t(2));
         m_clockSync->setStrategies(TimeSyncStrategy::SHIFT_TIMESTAMPS_FWD | TimeSyncStrategy::SHIFT_TIMESTAMPS_BWD);
         m_baseTimeOffset = microseconds_t(0);
@@ -749,6 +750,7 @@ public:
 
         m_running = false;
         while (!m_stopped) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             appProcessEvents();
         }
         safeStopSynchronizer(m_clockSync);
