@@ -150,7 +150,7 @@ ModuleSelectDialog::ModuleSelectDialog(const QList<QSharedPointer<ModuleInfo>> &
         });
 
     // focus
-    ui->modListView->setFocus();
+    ui->filterEdit->setFocus();
 }
 
 ModuleSelectDialog::~ModuleSelectDialog()
@@ -312,6 +312,11 @@ void ModuleSelectDialog::filterByTerm(const QString &filterTerm)
     }
 
     setModuleViewModel(m_filterModel);
+
+    // select the first entry by default
+    if (m_filterModel->rowCount() > 0)
+        ui->modListView->setCurrentIndex(m_filterModel->index(0, 0));
+
     m_termFilterPending = false;
 }
 

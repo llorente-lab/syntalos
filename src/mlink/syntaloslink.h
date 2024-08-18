@@ -43,6 +43,9 @@ using StopFn = std::function<void()>;
 using ShutdownFn = std::function<void()>;
 using NewDataRawFn = std::function<void(const void *data, size_t size)>;
 
+using ShowSettingsFn = std::function<void(const QByteArray &settings)>;
+using ShowDisplayFn = std::function<void(void)>;
+
 /**
  * @brief Reference for an input port
  */
@@ -111,6 +114,8 @@ class SyntalosLink : public QObject
 public:
     ~SyntalosLink();
 
+    QString instanceId() const;
+
     void raiseError(const QString &message);
     void raiseError(const QString &title, const QString &message);
 
@@ -131,6 +136,10 @@ public:
     void setStatusMessage(const QString &message);
 
     int maxRealtimePriority() const;
+
+    void setSettingsData(const QByteArray &data);
+    void setShowSettingsCallback(ShowSettingsFn callback);
+    void setShowDisplayCallback(ShowDisplayFn callback);
 
     std::vector<std::shared_ptr<InputPortInfo>> inputPorts() const;
     std::vector<std::shared_ptr<OutputPortInfo>> outputPorts() const;

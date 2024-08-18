@@ -50,13 +50,11 @@ public:
     void raiseError(const QString &message);
     bool loadPythonScript(const QString &script, const QString &wdir);
 
-    QByteArray changeSettings(const QByteArray &oldSettings);
-
     bool prepareStart(const QByteArray &settings);
     void start();
     bool stop();
     void shutdown();
-    void prepareAndRun();
+    void executePythonRunFn();
 
     static void makeDocFileAndQuit(const QString &fname);
 
@@ -66,11 +64,12 @@ protected:
 private:
     SyntalosLink *m_link;
     QTimer *m_evTimer;
-    bool m_pyInitialized;
-    PyObject *m_pyMain;
+    bool m_scriptLoaded;
 
     bool m_running;
     QByteArray m_settings;
 
+    void resetPyCallbacks();
+    bool initPythonInterpreter();
     void emitPyError();
 };
