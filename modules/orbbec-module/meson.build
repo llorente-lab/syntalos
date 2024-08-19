@@ -1,4 +1,5 @@
 # Specify OrbbecSDK path
+# todo: generalize this
 orbbec_sdk_path = '/home/llorentelab/Desktop/OrbbecSDK'
 
 # Create custom OrbbecSDK dependency
