@@ -241,33 +241,29 @@ public:
     }
 };
 
-class OrbbecModuleInfo : public AbstractModuleInfo
+QString OrbbecModuleInfo::id() const
 {
-public:
-    QString id() const override
-    {
-        return QStringLiteral("orbbec-cam");
-    }
+    return QStringLiteral("orbbec-cam");
+}
 
-    QString name() const override
-    {
-        return QStringLiteral("Orbbec Depth Sensor");
-    }
+QString OrbbecModuleInfo::name() const
+{
+    return QStringLiteral("Orbbec Depth Sensor");
+}
 
-    QString description() const override
-    {
-        return QStringLiteral("Capture depth and IR data with an Orbbec depth sensor");
-    }
+QString OrbbecModuleInfo::description() const
+{
+    return QStringLiteral("Capture depth and IR data with an Orbbec depth sensor");
+}
 
-    ModuleCategories categories() const override
-    {
-        return ModuleCategory::DEVICES;
-    }
+ModuleCategories OrbbecModuleInfo::categories() const
+{
+    return ModuleCategory::DEVICES;
+}
 
-    AbstractModule *createModule(QObject *parent) override
-    {
-        return new OrbbecModule(parent);
-    }
-};
+AbstractModule* OrbbecModuleInfo::createModule(QObject* parent)
+{
+    return new OrbbecModule(parent);
+}
 
 #include "orbbecmodule.moc"
