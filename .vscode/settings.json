@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "optional": "cpp",
-        "system_error": "cpp",
-        "chrono": "cpp",
-        "format": "cpp"
-    }
-}
