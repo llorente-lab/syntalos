@@ -4,6 +4,12 @@
 #include "datactl/frametype.h"
 #include <libobsensor/ObSensor.hpp>
 #include <opencv2/opencv.hpp>
+#include "orbbecSettingsDialog.h"
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QFile>
+#include <QDateTime>
 
 SYNTALOS_MODULE(OrbbecModule)
 
@@ -25,6 +31,11 @@ private:
     std::unique_ptr<SecondaryClockSynchronizer> m_clockSync;
     microseconds_t m_lastMasterTimestamp;
     microseconds_t m_lastDeviceTimestamp;
+
+    OrbbecSettingsDialog *m_settingsDialog;
+    QString m_subjectName;
+    QString m_sessionName;
+    QString m_metadataPath;
 
     void processDepthFrame(std::shared_ptr<ob::DepthFrame> depthFrame, std::shared_ptr<DataStream<Frame>>& output, microseconds_t frameRecvTime)
     {
@@ -96,16 +107,44 @@ private:
         return colorMappedIR;
     }
 
+    void createMetadataJson()
+    {
+        QJsonObject metadata;
+        metadata["SubjectName"] = m_subjectName;
+        metadata["SessionName"] = m_sessionName;
+        metadata["DepthResolution"] = QJsonArray{640, 576};
+        metadata["IsLittleEndian"] = true;
+        metadata["ColorResolution"] = QJsonArray{640, 576};
+        metadata["StartTime"] = QDateTime::currentDateTime().toString("yyyy-MM-ddTHH:mm:ss");
+
+        QJsonDocument doc(metadata);
+        QString fileName = QDir(m_metadataPath).filePath("metadata.json");
+        QFile file(fileName);
+        if (file.open(QIODevice::WriteOnly)) {
+            file.write(doc.toJson(QJsonDocument::Indented));
+            file.close();
+        } else {
+            qWarning() << "Couldn't open file for writing:" << fileName;
+        }
+    }
+
 public:
-    explicit OrbbecModule(QObject *parent = nullptr)
+    explicit OrbbecModule(ModuleInfo *modInfo, QObject *parent = nullptr)
         : AbstractModule(parent),
           m_pipelineStarted(false),
           m_frameIndex(0),
           m_fps(30.0),  
-          m_stopped(true)
+          m_stopped(true),
+          m_settingsDialog(nullptr)
     {
         m_depthOut = registerOutputPort<Frame>(QStringLiteral("depth-out"), QStringLiteral("Depth Frames"));
         m_irOut = registerOutputPort<Frame>(QStringLiteral("ir-out"), QStringLiteral("IR Frames"));
+
+        m_settingsDialog = new OrbbecSettingsDialog(this, nullptr);
+        m_settingsDialog->setWindowIcon(modInfo->icon());
+        addSettingsWindow(m_settingsDialog);
+
+        setName(name());
     }
 
     ~OrbbecModule() override 
@@ -124,6 +163,12 @@ public:
     ModuleDriverKind driver() const override
     {
         return ModuleDriverKind::THREAD_DEDICATED;
+    }
+
+    void setName(const QString &name) override
+    {
+        AbstractModule::setName(name);
+        m_settingsDialog->setWindowTitle(QStringLiteral("Settings for %1").arg(name));
     }
 
     bool prepare(const TestSubject &) override
@@ -158,6 +203,12 @@ public:
             raiseError(QStringLiteral("Unable to set up clock synchronizer!"));
             return false;
         }
+
+        m_subjectName = m_settingsDialog->subjectName();
+        m_sessionName = m_settingsDialog->sessionName();
+        m_metadataPath = m_settingsDialog->metadataPath();
+
+        createMetadataJson();
 
         return true;
     }
@@ -239,35 +290,51 @@ public:
         safeStopSynchronizer(m_clockSync);
         statusMessage("Camera disconnected.");
     }
+
+    void serializeSettings(const QString &, QVariantHash &settings, QByteArray &) override
+    {
+        settings.insert("subject_name", m_subjectName);
+        settings.insert("session_name", m_sessionName);
+        settings.insert("metadata_path", m_metadataPath);
+    }
+
+    bool loadSettings(const QString &, const QVariantHash &settings, const QByteArray &) override
+    {
+        m_subjectName = settings.value("subject_name").toString();
+        m_sessionName = settings.value("session_name").toString();
+        m_metadataPath = settings.value("metadata_path").toString();
+
+        m_settingsDialog->setSubjectName(m_subjectName);
+        m_settingsDialog->setSessionName(m_sessionName);
+        m_settingsDialog->setMetadataPath(m_metadataPath);
+
+        return true;
+    }
 };
 
-class OrbbecModuleInfo : public AbstractModuleInfo
+QString OrbbecModuleInfo::id() const
 {
-public:
-    QString id() const override
-    {
-        return QStringLiteral("orbbec-cam");
-    }
+    return QStringLiteral("orbbec-cam");
+}
 
-    QString name() const override
-    {
-        return QStringLiteral("Orbbec Depth Sensor");
-    }
+QString OrbbecModuleInfo::name() const
+{
+    return QStringLiteral("Orbbec Depth Sensor");
+}
 
-    QString description() const override
-    {
-        return QStringLiteral("Capture depth and IR data with an Orbbec depth sensor");
-    }
+QString OrbbecModuleInfo::description() const
+{
+    return QStringLiteral("Capture depth and IR data with an Orbbec depth sensor");
+}
 
-    ModuleCategories categories() const override
-    {
-        return ModuleCategory::DEVICES;
-    }
+ModuleCategories OrbbecModuleInfo::categories() const
+{
+    return ModuleCategory::DEVICES;
+}
 
-    AbstractModule *createModule(QObject *parent) override
-    {
-        return new OrbbecModule(parent);
-    }
-};
+AbstractModule* OrbbecModuleInfo::createModule(QObject* parent)
+{
+    return new OrbbecModule(this, parent);
+}
 
 #include "orbbecmodule.moc"

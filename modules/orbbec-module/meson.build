@@ -11,17 +11,21 @@ orbbec_sdk_dep = declare_dependency(
 # Build definitions for module: camera-generic
 module_hdr = [
     'orbbecmodule.h',
+    'orbbecSettingsDialog.h',
 ]
 module_moc_hdr = [
-    'orbbecmodule.h'
+    'orbbecmodule.h',
+    'orbbecSettingsDialog.h',
 ]
 
 module_src = [
-    'orbbecmodule.cpp'
+    'orbbecmodule.cpp',
+    'orbbecSettingsDialog.cpp',
 ]
 
 module_moc_src = [
-    'orbbecmodule.cpp'
+    'orbbecmodule.cpp',
+    'orbbecSettingsDialog.cpp',
 ]
 module_ui = []
 
@@ -29,7 +33,6 @@ v4l_dep = dependency('libv4l2')
 module_deps = [
     opencv_dep,
     orbbec_sdk_dep,
-    vips_dep,
     v4l_dep,
 ]
 module_data = []
