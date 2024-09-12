@@ -843,7 +843,10 @@ void VideoWriter::initializeInternal()
         if (d->inputPixFormat == AV_PIX_FMT_GRAY8)
             d->encPixFormat = AV_PIX_FMT_GRAY8;
         if (d->inputPixFormat == AV_PIX_FMT_GRAY16LE)
-            d->encPixFormat = AV_PIX_FMT_GRAY8;
+            d->encPixFormat = AV_PIX_FMT_GRAY16LE;
+        // minor change
+        // the idea here is to encode the videos in 16 LE format
+        // its less efficient for storage but moseq needs it
         break;
     default:
         break;
