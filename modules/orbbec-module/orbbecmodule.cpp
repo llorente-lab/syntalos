@@ -152,6 +152,11 @@ public:
             m_depthStreamEnabled = m_settingsDialog->isDepthStreamEnabled(); // T or F
             m_irStreamEnabled = m_settingsDialog->isIRStreamEnabled(); // T or F
 
+            if (!m_depthStreamEnabled || !m_irStreamEnabled) {
+                raiseError(QStringLiteral("A stream must be enabled!"));
+                return false;
+            }
+
             if (m_depthStreamEnabled) { // if depth stream is enabled
                 auto depthProfile = m_pipeline->getStreamProfileList(OB_SENSOR_DEPTH)->getVideoStreamProfile(640, OB_HEIGHT_ANY, OB_FORMAT_Y16, 30);
                 // query device for depth profiles and select the one we want. i've hardcoded this for simplicity's sake
@@ -254,10 +259,6 @@ public:
                         m_pipeline->stop();
                     }
                     continue;
-                }
-
-                if (!m_depthStreamEnabled || !m_irStreamEnabled) {
-                    raiseError(QStringLiteral("A stream must be enabled!"));
                 }
 
                 if (m_depthStreamEnabled) {
