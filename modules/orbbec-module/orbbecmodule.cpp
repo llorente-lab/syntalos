@@ -256,6 +256,10 @@ public:
                     continue;
                 }
 
+                if (!m_depthStreamEnabled || !m_irStreamEnabled) {
+                    raiseError(QStringLiteral("A stream must be enabled!"));
+                }
+
                 if (m_depthStreamEnabled) {
                     auto depthFrame = frameSet->depthFrame(); // get depth frame
                     if (depthFrame) {
@@ -354,7 +358,7 @@ private:
 
         int width = depthFrame->width();
         int height = depthFrame->height();
-        float scale = depthFrame->getValueScale(); // scale the videos
+        float scale = depthFrame->getValueScale(); // scale for the depth videos
 
         // Create raw depth data (16-bit). This is straightforward:
         // OpenCV matrices (cv::Mat) are defined with 4 main parameters: height, width, pixel format, and a pointer to the data.
