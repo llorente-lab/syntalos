@@ -273,6 +273,7 @@ public:
                 }
 
                 m_frameIndex++;  // Increment frame index after processing both frames
+                // make sure this is out of the main loop or else processIRFrame and processDepthFrame will be incrementing frame index simultaneously
 
                 const auto totalTime = timeDiffToNowMsec(cycleStartTime);
                 currentFps = static_cast<int>(1 / (totalTime.count() / static_cast<double>(1000)));
@@ -364,13 +365,14 @@ private:
         //    This data is passed to OpenCV so it can wrap and manage the depth data within its matrix structure.
         // By passing the pointer to the data, OpenCV doesn't copy the data; it directly uses the provided memory, which is efficient for real-time processing.
         // We're gonna send this directly to raw depth port
+        // This is not processed because processing is being handled by moseq
         cv::Mat rawDepth(height, width, CV_16UC1, (void*)depthFrame->data());
 
         // Create display frame (8-bit, color mapped)
         cv::Mat scaledDepth;
         rawDepth.convertTo(scaledDepth, CV_32F, scale);
         cv::Mat displayDepth;
-        scaledDepth.convertTo(displayDepth, CV_8U, 255.0 / 5000);  // Assuming max depth of 5000mm
+        scaledDepth.convertTo(displayDepth, CV_8U, 255.0 / 5000);  // lets assume a max depth of 5000
         cv::applyColorMap(displayDepth, displayDepth, cv::COLORMAP_JET);
 
         microseconds_t deviceTimestamp = microseconds_t(depthFrame->timeStamp());
@@ -385,7 +387,7 @@ private:
         m_depthDispOut->push(dispFrame);
 
         // Print center pixel distance every 30 frames
-        // this is useful for debugging and make sure we're actually scaling the video directly
+        // this is useful for debugging and make sure we're actually scaling the video correctly
         if (m_frameIndex % 30 == 0) {
             uint16_t* data = (uint16_t*)depthFrame->data();
             float centerDistance = data[width * height / 2 + width / 2] * scale;
@@ -419,6 +421,7 @@ private:
             cv::applyColorMap(irVis, colorMappedIR, cv::COLORMAP_HOT);  // Apply a color map for visualization
 
             microseconds_t deviceTimestamp = microseconds_t(irFrame->timeStamp()); // IR timestamps
+            // we could probably remove this since its not very useful to have them, but for downstream analysis purposes, just why not lol
             if (m_clockSync) {
                 m_clockSync->processTimestamp(frameRecvTime, deviceTimestamp);
             } else {
@@ -435,6 +438,7 @@ private:
     }
 };
 
+// internal syntalos module info stuff
 QString OrbbecModuleInfo::id() const
 {
     return QStringLiteral("orbbec-cam");
@@ -442,12 +446,12 @@ QString OrbbecModuleInfo::id() const
 
 QString OrbbecModuleInfo::name() const
 {
-    return QStringLiteral("Orbbec Depth Sensor");
+    return QStringLiteral("Orbbec Femto Camera");
 }
 
 QString OrbbecModuleInfo::description() const
 {
-    return QStringLiteral("Capture depth and IR data with an Orbbec depth sensor");
+    return QStringLiteral("Capture depth and infrared data with an Orbbec Femto sensor!");
 }
 
 ModuleCategories OrbbecModuleInfo::categories() const
