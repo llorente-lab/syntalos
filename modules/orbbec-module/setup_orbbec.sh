@@ -1,7 +1,18 @@
 #!/bin/bash
 
-# Clone the Orbbec SDK repository
-git clone https://github.com/orbbec/OrbbecSDK.git
+set -e
+
+check_command git
+check_command cmake
+check_command sudo
+
+sudo -v || error_exit "This script requires sudo privileges. Please run as a user with sudo access."
+
+if [ -d "OrbbecSDK" ]; then
+  echo "Directory 'OrbbecSDK' already exists. Skipping git clone."
+else
+  git clone https://github.com/orbbec/OrbbecSDK.git || error_exit "Failed to clone OrbbecSDK repository."
+fi
 
 # Navigate to the OrbbecSDK directory
 cd OrbbecSDK
