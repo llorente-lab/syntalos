@@ -9,7 +9,7 @@ To simplify things, there is a script (setup_orbbec.sh) that automates much of t
 Execute the provided setup_orbbec.sh script to install and configure the Orbbec SDK:
 
 ```bash
-./setup_orbbec.sh
+sudo ./setup_orbbec.sh
 ```
 This script will:
 1. Clone the Orbbec SDK repository.
