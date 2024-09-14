@@ -32,7 +32,6 @@ subdir('videorecorder')
 subdir('videotransform')
 subdir('camera-generic')
 subdir('orbbec-module')
-subdir('pyorbbec')
 
 if 'camera-arv' in modules_enabled
     subdir('camera-arv')

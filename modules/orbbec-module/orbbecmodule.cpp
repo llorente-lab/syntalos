@@ -331,7 +331,7 @@ public:
 
         safeStopSynchronizer(m_clockSync);
     }
-
+    
     void serializeSettings(const QString &, QVariantHash &settings, QByteArray &) override
     {
         settings.insert("depth_stream_enabled", m_depthStreamEnabled);
@@ -443,6 +443,31 @@ private:
         }
     }
 };
+
+QString OrbbecModuleInfo::id() const
+{
+    return QStringLiteral("orbbec-cam");
+}
+
+QString OrbbecModuleInfo::name() const
+{
+    return QStringLiteral("Orbbec Depth Sensor");
+}
+
+QString OrbbecModuleInfo::description() const
+{
+    return QStringLiteral("Capture depth and IR data with an Orbbec depth sensor");
+}
+
+ModuleCategories OrbbecModuleInfo::categories() const
+{
+    return ModuleCategory::DEVICES;
+}
+
+AbstractModule* OrbbecModuleInfo::createModule(QObject* parent)
+{
+    return new OrbbecModule(parent);
+}
 
 // internal syntalos module info stuff
 QString OrbbecModuleInfo::id() const
