@@ -8,8 +8,9 @@ To simplify things, there is a script (setup_orbbec.sh) that automates much of t
 
 Execute the provided setup_orbbec.sh script to install and configure the Orbbec SDK:
 
+```bash
 ./setup_orbbec.sh
-
+```
 This script will:
 1. Clone the Orbbec SDK repository.
 2. Build the SDK.
@@ -22,4 +23,7 @@ After running the script:
 2. Open the meson.build file located in this repository.
 3. At the top of the meson.build file, replace the orbbec_sdk_path variable with the location of your local copy of the Orbbec SDK. It should look something like this:
 
-orbbec_sdk_path = '/path/to/your/local/orbbec/sdk'
+```bash
+orbbec_sdk_path = '/path/to/your/local/copy'
+```
+
