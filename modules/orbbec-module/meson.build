@@ -12,17 +12,21 @@ orbbec_sdk_dep = declare_dependency(
 # Build definitions for module: camera-generic
 module_hdr = [
     'orbbecmodule.h',
+    'orbbecSettingsDialog.h',
 ]
 module_moc_hdr = [
-    'orbbecmodule.h'
+    'orbbecmodule.h',
+    'orbbecSettingsDialog.h',
 ]
 
 module_src = [
-    'orbbecmodule.cpp'
+    'orbbecmodule.cpp',
+    'orbbecSettingsDialog.cpp',
 ]
 
 module_moc_src = [
-    'orbbecmodule.cpp'
+    'orbbecmodule.cpp',
+    'orbbecSettingsDialog.cpp',
 ]
 module_ui = []
 
