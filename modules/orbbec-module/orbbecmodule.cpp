@@ -201,6 +201,8 @@ public:
             m_metadataFilePath = dstore->setDataFile("metadata.json");
             m_metadataDict["SubjectName"] = subject.id;
             m_metadataDict["SessionName"] = datasetNameSuggestion();
+            m_metadataDict["DepthResolution"] = QJsonArray({640, 576}); // initialize as a QJSon Array
+            m_metadataDict["ColorResolution"] = QJsonArray({640, 576});
             m_metadataDict["DepthStreamEnabled"] = m_depthStreamEnabled;
             m_metadataDict["IRStreamEnabled"] = m_irStreamEnabled;
             m_metadataDict["IsLittleEndian"] = true; // hard coded this but again, we ca
