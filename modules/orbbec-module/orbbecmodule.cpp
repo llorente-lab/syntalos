@@ -444,6 +444,8 @@ private:
     }
 };
 
+// internal syntalos stuff
+
 QString OrbbecModuleInfo::id() const
 {
     return QStringLiteral("orbbec-cam");
@@ -467,32 +469,6 @@ ModuleCategories OrbbecModuleInfo::categories() const
 AbstractModule* OrbbecModuleInfo::createModule(QObject* parent)
 {
     return new OrbbecModule(parent);
-}
-
-// internal syntalos module info stuff
-QString OrbbecModuleInfo::id() const
-{
-    return QStringLiteral("orbbec-cam");
-}
-
-QString OrbbecModuleInfo::name() const
-{
-    return QStringLiteral("Orbbec Femto Camera");
-}
-
-QString OrbbecModuleInfo::description() const
-{
-    return QStringLiteral("Capture depth and infrared data with an Orbbec Femto sensor!");
-}
-
-ModuleCategories OrbbecModuleInfo::categories() const
-{
-    return ModuleCategory::DEVICES;
-}
-
-AbstractModule* OrbbecModuleInfo::createModule(QObject* parent)
-{
-    return new OrbbecModule(this, parent);
 }
 
 #include "orbbecmodule.moc"
