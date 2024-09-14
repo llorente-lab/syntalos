@@ -72,7 +72,7 @@ to submit a change, bugfix or new module.
  * C++20 compatible compiler
    (GCC >= 12 or Clang >= 16. GCC is recommended)
  * Meson (>= 0.64)
- * Orbbec SDK (check out [the Orbbec module's README](https://github.com/llorente-lab/syntalos/blob/master/modules/orbbec-module/README.md)) for more information on setting this up.
+ * Orbbec SDK (check out [the Orbbec module's README](https://github.com/llorente-lab/syntalos/blob/master/modules/orbbec-module/README.md) for more information on setting this up).
  * Qt5 (>= 5.12)
  * Qt5 Test
  * Qt5 OpenGL
