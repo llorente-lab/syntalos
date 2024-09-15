@@ -37,4 +37,9 @@ sudo ./install_udev_rules.sh
 sudo udevadm control --reload
 sudo udevadm trigger
 
+cd ../..
+
+LOCATION=$(pwd)
+
 echo "Orbbec SDK installation and udev rules setup completed."
+echo "The Orbbec SDK has been installed in this directory: $LOCATION"
