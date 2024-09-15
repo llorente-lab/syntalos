@@ -2,23 +2,26 @@
 
 set -e
 
-check_command git
-check_command cmake
-check_command sudo
+# check for required commands
+command -v git >/dev/null 2>&1 || { echo >&2 "Error: git is not installed."; exit 1; }
+command -v cmake >/dev/null 2>&1 || { echo >&2 "Error: cmake is not installed."; exit 1; }
+command -v sudo >/dev/null 2>&1 || { echo >&2 "Error: script must be run as sudo."; exit 1; }
 
-sudo -v || error_exit "This script requires sudo privileges. Please run as a user with sudo access."
+# Check sudo privileges
+sudo -v || { echo "This script requires sudo privileges. Please run as a user with sudo access."; exit 1; }
 
+# Clone OrbbecSDK repository if it doesn't exist
 if [ -d "OrbbecSDK" ]; then
   echo "Directory 'OrbbecSDK' already exists. Skipping git clone."
 else
-  git clone https://github.com/orbbec/OrbbecSDK.git || error_exit "Failed to clone OrbbecSDK repository."
+  git clone https://github.com/orbbec/OrbbecSDK.git || { echo "Failed to clone OrbbecSDK repository."; exit 1; }
 fi
 
 # Navigate to the OrbbecSDK directory
 cd OrbbecSDK
 
 # Create a build directory and navigate into it
-mkdir build
+mkdir -p build
 cd build
 
 # Run cmake and build the project in Release configuration
