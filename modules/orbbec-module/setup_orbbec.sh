@@ -5,10 +5,6 @@ set -e
 # check for required commands
 command -v git >/dev/null 2>&1 || { echo >&2 "Error: git is not installed."; exit 1; }
 command -v cmake >/dev/null 2>&1 || { echo >&2 "Error: cmake is not installed."; exit 1; }
-command -v sudo >/dev/null 2>&1 || { echo >&2 "Error: script must be run as sudo."; exit 1; }
-
-# Check sudo privileges
-sudo -v || { echo "This script requires sudo privileges. Please run as a user with sudo access."; exit 1; }
 
 # Clone OrbbecSDK repository if it doesn't exist
 if [ -d "OrbbecSDK" ]; then
