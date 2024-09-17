@@ -168,11 +168,6 @@ public:
             m_depthStreamEnabled = m_settingsDialog->isDepthStreamEnabled(); // T or F
             m_irStreamEnabled = m_settingsDialog->isIRStreamEnabled();       // T or F
 
-            if (!m_depthStreamEnabled || !m_irStreamEnabled) {
-                raiseError(QStringLiteral("A stream must be enabled!"));
-                return false;
-            }
-
             if (m_depthStreamEnabled) { // if depth stream is enabled
                 auto depthProfile = m_pipeline->getStreamProfileList(OB_SENSOR_DEPTH)
                                         ->getVideoStreamProfile(640, OB_HEIGHT_ANY, OB_FORMAT_Y16, 30);
@@ -184,11 +179,13 @@ public:
                 m_depthRawOut->setMetadataValue("has_color", false);
                 m_depthRawOut->setMetadataValue("depth", CV_16U);
                 m_depthRawOut->setSuggestedDataName(QStringLiteral("%1/depth").arg(datasetNameSuggestion()));
+                m_depthRawOut->setMetadataValue("size", QSize(640, 576));
 
                 m_depthDispOut->setMetadataValue("framerate", m_fps);
                 m_depthDispOut->setMetadataValue("has_color", true);
                 m_depthDispOut->setMetadataValue("depth", CV_8U);
                 m_depthDispOut->setSuggestedDataName(QStringLiteral("%1/depth_display").arg(datasetNameSuggestion()));
+                m_depthDispOut->setMetadataValue("size", QSize(640, 576));
                 // We don't REALLY need this since there's no point in saving the display video (unless you wanna look
                 // at it), but why not
 
@@ -232,16 +229,10 @@ public:
         }
 
         // set up clock synchronizer
-        m_clockSync = initClockSynchronizer(m_fps);
-        m_clockSync->setStrategies(TimeSyncStrategy::SHIFT_TIMESTAMPS_BWD);
 
         m_lastMasterTimestamp = microseconds_t(0);
         m_lastDeviceTimestamp = microseconds_t(0);
         // start the synchronizer
-        if (!m_clockSync->start()) {
-            raiseError(QStringLiteral("Unable to set up clock synchronizer!"));
-            return false;
-        }
 
         return true;
     }
@@ -260,6 +251,9 @@ public:
         auto frameProcessFailedCount = 0;
         m_stopped = false;
 
+        m_clockSync = initClockSynchronizer(m_fps);
+        m_clockSync->setStrategies(TimeSyncStrategy::SHIFT_TIMESTAMPS_BWD);
+
         waitCondition->wait(this);
 
         try {
@@ -270,7 +264,12 @@ public:
                 const auto cycleStartTime = currentTimePoint();
 
                 auto frameSet = m_pipeline->waitForFrames(200); // wait 200 ms for frames
+                microseconds_t frameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
 
+                if (!m_clockSync->start()) {
+                    raiseError(QStringLiteral("Unable to set up clock synchronizer!"));
+                    return;
+                }
                 if (frameSet == nullptr) {
                     frameProcessFailedCount++;
                     std::cout << "Dropped frame. Frame process failed count is now " << frameProcessFailedCount
@@ -287,16 +286,16 @@ public:
                 if (m_depthStreamEnabled) {
                     auto depthFrame = frameSet->depthFrame(); // get depth frame
                     if (depthFrame) {
-                        microseconds_t depthFrameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
-                        processDepthFrame(depthFrame, depthFrameRecvTime);
+                        //microseconds_t depthFrameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
+                        processDepthFrame(depthFrame, frameRecvTime);
                     }
                 }
 
                 if (m_irStreamEnabled) {
                     auto irFrame = frameSet->irFrame(); // get ir frame
                     if (irFrame) {
-                        microseconds_t irFrameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
-                        processIRFrame(irFrame, m_irOut, irFrameRecvTime);
+                        //microseconds_t irFrameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
+                        processIRFrame(irFrame, m_irOut, frameRecvTime);
                     }
                 }
 
@@ -320,6 +319,7 @@ public:
             }
 
             m_pipeline->stop();
+            safeStopSynchronizer(m_clockSync);
             m_pipelineStarted = false;
 
         } catch (const ob::Error &e) {
@@ -352,8 +352,6 @@ public:
         } else {
             raiseError(QStringLiteral("Failed to save metadata to: %1").arg(m_metadataFilePath));
         }
-
-        safeStopSynchronizer(m_clockSync);
     }
 
     void serializeSettings(const QString &, QVariantHash &settings, QByteArray &) override
@@ -482,7 +480,7 @@ private:
 
 QString OrbbecModuleInfo::id() const
 {
-    return QStringLiteral("orbbec-cam");
+    return QStringLiteral("camera-orbbec");
 }
 
 QString OrbbecModuleInfo::name() const
@@ -502,7 +500,7 @@ ModuleCategories OrbbecModuleInfo::categories() const
 
 AbstractModule *OrbbecModuleInfo::createModule(QObject *parent)
 {
-    return new OrbbecModule(parent);
+    return new OrbbecModule(this, parent);
 }
 
 #include "orbbecmodule.moc"
