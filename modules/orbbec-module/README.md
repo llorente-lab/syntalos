@@ -27,3 +27,5 @@ After running the script:
 orbbec_sdk_path = '/path/to/your/local/copy'
 ```
 
+Keep in mind that when running this module with a VideoRecorder module, you *need* to make sure that the video is being saved as an AVI and is encoded in FFV1. This is because this will ensure that the pixel format is Gray-16 Little Endian, which is the raw pixel format that the sensor sends. 
+
