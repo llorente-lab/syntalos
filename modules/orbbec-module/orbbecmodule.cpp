@@ -274,7 +274,7 @@ public:
                     frameProcessFailedCount++;
                     std::cout << "Dropped frame. Frame process failed count is now " << frameProcessFailedCount
                               << std::endl;
-                    if (frameProcessFailedCount > 50) { // too many dropped frames -> stop the recording
+                    if (frameProcessFailedCount > 32) { // too many dropped frames -> stop the recording
                         raiseError(QStringLiteral(
                             "Too many attempts to process frames have failed. Is the camera connected properly?"));
                         m_running = false;
