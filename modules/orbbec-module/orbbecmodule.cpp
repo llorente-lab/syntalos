@@ -101,8 +101,8 @@ private:
     std::atomic_bool m_stopped; // internal
 
     std::unique_ptr<SecondaryClockSynchronizer> m_clockSync; // clock synchronizer. we let syntalos handle this
-    microseconds_t m_lastMasterTimestamp;                    // master timestamp (from the system)
-    microseconds_t m_lastDeviceTimestamp; // device timestamp (from the sensor). the idea is to synchronize different
+    milliseconds_t m_lastMasterTimestamp;                    // master timestamp (from the system)
+    milliseconds_t m_lastDeviceTimestamp; // device timestamp (from the sensor). the idea is to synchronize different
                                           // cameras based on the system timestamp
 
     QString m_metadataFilePath;
@@ -227,11 +227,9 @@ public:
             raiseError(QStringLiteral("Orbbec initialization error: %1").arg(e.getMessage()));
             return false;
         }
-
-        // set up clock synchronizer
-
-        m_lastMasterTimestamp = microseconds_t(0);
-        m_lastDeviceTimestamp = microseconds_t(0);
+        
+        m_lastMasterTimestamp = milliseconds_t(0);
+        m_lastDeviceTimestamp = milliseconds_t(0);
         // start the synchronizer
 
         return true;
@@ -251,10 +249,15 @@ public:
         auto frameProcessFailedCount = 0;
         m_stopped = false;
 
+        waitCondition->wait(this);
+
         m_clockSync = initClockSynchronizer(m_fps);
         m_clockSync->setStrategies(TimeSyncStrategy::SHIFT_TIMESTAMPS_BWD);
 
-        waitCondition->wait(this);
+        if (!m_clockSync->start()) {
+            raiseError(QStringLiteral("Unable to set up clock synchronizer!"));
+            return;
+        }
 
         try {
             m_pipeline->start(m_config);
@@ -264,12 +267,8 @@ public:
                 const auto cycleStartTime = currentTimePoint();
 
                 auto frameSet = m_pipeline->waitForFrames(200); // wait 200 ms for frames
-                microseconds_t frameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
+                //microseconds_t frameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
 
-                if (!m_clockSync->start()) {
-                    raiseError(QStringLiteral("Unable to set up clock synchronizer!"));
-                    return;
-                }
                 if (frameSet == nullptr) {
                     frameProcessFailedCount++;
                     std::cout << "Dropped frame. Frame process failed count is now " << frameProcessFailedCount
@@ -287,7 +286,7 @@ public:
                     auto depthFrame = frameSet->depthFrame(); // get depth frame
                     if (depthFrame) {
                         //microseconds_t depthFrameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
-                        processDepthFrame(depthFrame, frameRecvTime);
+                        processDepthFrame(depthFrame);
                     }
                 }
 
@@ -295,7 +294,7 @@ public:
                     auto irFrame = frameSet->irFrame(); // get ir frame
                     if (irFrame) {
                         //microseconds_t irFrameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
-                        processIRFrame(irFrame, m_irOut, frameRecvTime);
+                        processIRFrame(irFrame, m_irOut);
                     }
                 }
 
@@ -372,7 +371,7 @@ public:
     }
 
 private:
-    void processDepthFrame(std::shared_ptr<ob::DepthFrame> depthFrame, microseconds_t frameRecvTime)
+    void processDepthFrame(std::shared_ptr<ob::DepthFrame> depthFrame)
     {
         // quick check for valid
         if (!depthFrame || depthFrame->dataSize() == 0) {
@@ -407,15 +406,26 @@ private:
         scaledDepth.convertTo(displayDepth, CV_8U, 255.0 / 5000); // lets assume a max depth of 5000
         cv::applyColorMap(displayDepth, displayDepth, cv::COLORMAP_JET);
 
-        microseconds_t deviceTimestamp = microseconds_t(depthFrame->timeStamp());
-        m_clockSync->processTimestamp(frameRecvTime, deviceTimestamp);
+        auto deviceTimestampMs = depthFrame->timeStamp();
+        auto masterTimestampMs = depthFrame->systemTimeStamp();
+
+        microseconds_t deviceTimestamp = std::chrono::duration_cast<microseconds_t>(milliseconds_t(deviceTimestampMs));
+        microseconds_t masterTimestamp = std::chrono::duration_cast<microseconds_t>(milliseconds_t(masterTimestampMs));
+
+        auto updatedFrameTime = masterTimestamp;
+
+        if (m_clockSync) {
+            m_clockSync->processTimestamp(updatedFrameTime, deviceTimestamp);
+        } else {
+            qWarning() << "Clock synchronizer is not initialized yet";
+        }
 
         // Push raw frame (16-bit depth)
-        Frame rawFrame(rawDepth, m_frameIndex, frameRecvTime);
+        Frame rawFrame(rawDepth, m_frameIndex, updatedFrameTime);
         m_depthRawOut->push(rawFrame);
 
         // Push display frame (8-bit color mapped)
-        Frame dispFrame(displayDepth, m_frameIndex, frameRecvTime);
+        Frame dispFrame(displayDepth, m_frameIndex, updatedFrameTime);
         m_depthDispOut->push(dispFrame);
 
         // Print center pixel distance every 30 frames
@@ -429,8 +439,8 @@ private:
 
     void processIRFrame(
         std::shared_ptr<ob::IRFrame> irFrame,
-        std::shared_ptr<DataStream<Frame>> &output,
-        microseconds_t frameRecvTime)
+        std::shared_ptr<DataStream<Frame>> &output
+        )
     {
         // more straightforward
         if (!irFrame || irFrame->dataSize() == 0) {
@@ -457,16 +467,23 @@ private:
             cv::Mat colorMappedIR;
             cv::applyColorMap(irVis, colorMappedIR, cv::COLORMAP_HOT); // Apply a color map for visualization
 
-            microseconds_t deviceTimestamp = microseconds_t(irFrame->timeStamp()); // IR timestamps
-            // we could probably remove this since its not very useful to have them, but for downstream analysis
-            // purposes, just why not lol
+            auto deviceTimestampMs = irFrame->timeStamp();
+            auto masterTimestampMs = irFrame->systemTimeStamp();
+
+            // Convert timestamps to microseconds
+            microseconds_t deviceTimestamp = std::chrono::duration_cast<microseconds_t>(milliseconds_t(deviceTimestampMs));
+            microseconds_t masterTimestamp = std::chrono::duration_cast<microseconds_t>(milliseconds_t(masterTimestampMs));
+
+            auto updatedFrameTime = masterTimestamp;
+
+            // we don't really need this, but for downstream analysis why not lol
             if (m_clockSync) {
-                m_clockSync->processTimestamp(frameRecvTime, deviceTimestamp);
+                m_clockSync->processTimestamp(updatedFrameTime, deviceTimestamp);
             } else {
                 qWarning() << "Clock synchronizer is not initialized";
             }
 
-            Frame outFrame(colorMappedIR, m_frameIndex, frameRecvTime);
+            Frame outFrame(colorMappedIR, m_frameIndex, updatedFrameTime);
             output->push(outFrame);
         } catch (const cv::Exception &e) {
             qWarning() << "OpenCV error in processIRFrame:" << e.what();
