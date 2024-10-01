@@ -1,6 +1,6 @@
 # Specify OrbbecSDK path
 # this is convenient for now bc it makes building over and over again easy but still
-orbbec_sdk_path = '/your/copy/of/the/sdk'
+orbbec_sdk_path = '/home/llorentelab/Desktop/OrbbecSDK'
 
 # Create custom OrbbecSDK dependency
 orbbec_sdk_dep = declare_dependency(
