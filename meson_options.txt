@@ -24,12 +24,14 @@ option('modules',
               'intan-rhx',    # Intan RHX DAQ module
               'miniscope',    # UCLA Miniscope module
               'plot',         # Plotting modules using ImGui
+              'camera-orbbec', # Orbbec Depth Sensor module
     ],
     value : ['camera-arv',
              'camera-tis',
              'intan-rhx',
              'miniscope',
              'plot',
+             'camera-orbbec',
     ],
     description: 'Select modules to enable.'
 )
