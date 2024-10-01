@@ -33,8 +33,8 @@ RecorderSettingsDialog::RecorderSettingsDialog(QWidget *parent)
     ui->setupUi(this);
     setWindowIcon(QIcon(":/icons/generic-config"));
 
-    ui->containerComboBox->addItem("MKV", QVariant::fromValue(VideoContainer::Matroska));
     ui->containerComboBox->addItem("AVI", QVariant::fromValue(VideoContainer::AVI));
+    ui->containerComboBox->addItem("MKV", QVariant::fromValue(VideoContainer::Matroska));
     ui->containerComboBox->setCurrentIndex(0);
 
     // We currently only permit a limited set of codecs - less choices are better here.
