@@ -227,7 +227,7 @@ public:
             raiseError(QStringLiteral("Orbbec initialization error: %1").arg(e.getMessage()));
             return false;
         }
-        
+
         m_lastMasterTimestamp = milliseconds_t(0);
         m_lastDeviceTimestamp = milliseconds_t(0);
         // start the synchronizer
@@ -267,7 +267,7 @@ public:
                 const auto cycleStartTime = currentTimePoint();
 
                 auto frameSet = m_pipeline->waitForFrames(200); // wait 200 ms for frames
-                //microseconds_t frameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
+                // microseconds_t frameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
 
                 if (frameSet == nullptr) {
                     frameProcessFailedCount++;
@@ -285,7 +285,7 @@ public:
                 if (m_depthStreamEnabled) {
                     auto depthFrame = frameSet->depthFrame(); // get depth frame
                     if (depthFrame) {
-                        //microseconds_t depthFrameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
+                        // microseconds_t depthFrameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
                         processDepthFrame(depthFrame);
                     }
                 }
@@ -293,7 +293,7 @@ public:
                 if (m_irStreamEnabled) {
                     auto irFrame = frameSet->irFrame(); // get ir frame
                     if (irFrame) {
-                        //microseconds_t irFrameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
+                        // microseconds_t irFrameRecvTime = microseconds_t(m_syTimer->timeSinceStartUsec());
                         processIRFrame(irFrame, m_irOut);
                     }
                 }
@@ -437,10 +437,7 @@ private:
         }
     }
 
-    void processIRFrame(
-        std::shared_ptr<ob::IRFrame> irFrame,
-        std::shared_ptr<DataStream<Frame>> &output
-        )
+    void processIRFrame(std::shared_ptr<ob::IRFrame> irFrame, std::shared_ptr<DataStream<Frame>> &output)
     {
         // more straightforward
         if (!irFrame || irFrame->dataSize() == 0) {
@@ -471,8 +468,10 @@ private:
             auto masterTimestampMs = irFrame->systemTimeStamp();
 
             // Convert timestamps to microseconds
-            microseconds_t deviceTimestamp = std::chrono::duration_cast<microseconds_t>(milliseconds_t(deviceTimestampMs));
-            microseconds_t masterTimestamp = std::chrono::duration_cast<microseconds_t>(milliseconds_t(masterTimestampMs));
+            microseconds_t deviceTimestamp = std::chrono::duration_cast<microseconds_t>(
+                milliseconds_t(deviceTimestampMs));
+            microseconds_t masterTimestamp = std::chrono::duration_cast<microseconds_t>(
+                milliseconds_t(masterTimestampMs));
 
             auto updatedFrameTime = masterTimestamp;
 
