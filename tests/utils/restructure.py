@@ -27,8 +27,8 @@ def restructure_directory(source_root):
         date_name = date_dir.name # assign date_name to the name of date_dir
 
         for tp_dir in date_dir.iterdir(): # iterate through tp subdirectory
-            if not tp_dir.name.startswith("tp"): # break if it doesnt start with tp
-                continue
+            # if not tp_dir.name.startswith("tp"): # break if it doesnt start with tp
+               # continue
             
             combined_name = f"{date_name}_{tp_dir.name}" # combine time point and date to datename_tp
             raw_combined_dir = raw_dir / combined_name # create the directories
