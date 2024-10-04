@@ -44,6 +44,11 @@ int main(int argc, char *argv[])
     roudiArgs.compatibilityCheckLevel = iox::version::CompatibilityCheckLevel::PATCH;
     roudiArgs.processKillDelay = iox::units::Duration::fromSeconds(120);
     roudiArgs.run = true;
+    
+    // if (prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) {
+    //    iox::log::error("Failed to set parent death signal");
+    //    return 1;
+    // }
 
     // tear down the daemon if our main process dies
     prctl(PR_SET_PDEATHSIG, SIGTERM);
