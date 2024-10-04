@@ -56,7 +56,7 @@ def restructure_directory(source_root):
                     elif 'miniscope' in root_path.parts:
                         if file.endswith(('.mkv', '.avi', '.tsync', '.csv')):
                             shutil.copy2(source_file, raw_combined_dir / "Miniscope" / file)
-                    elif 'orbbec-depth-sensor' in root_path.parts:
+                    elif 'orbbec' in root_path.parts:
                         if file.endswith(('.mkv', '.avi', '.tsync')):
                             shutil.copy2(source_file, raw_combined_dir / "Behavior" / file)
 
